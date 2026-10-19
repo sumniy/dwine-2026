@@ -108,6 +108,16 @@ svg.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-widt
 #sPanel{height:calc(100% - 28px - env(safe-area-inset-top,0px))}
 #sPanel .s-row .srch{flex:1}
 .shint{color:var(--muted);font-size:13.5px;margin:4px 2px}
+/* more room while reading: bars slide away on scroll down, come back on scroll up */
+.hdr,.tabs,.s-top,.s-foot{transition:transform .22s ease}
+.grp-h{transition:top .22s ease}
+html.ui-hide .hdr{transform:translateY(calc(-100% - env(safe-area-inset-top,0px) - 2px))}
+html.ui-hide .tabs{transform:translateY(100%)}
+html.ui-hide .grp-h{top:env(safe-area-inset-top,0px)}
+.panel-s.p-hide .s-top{transform:translateY(-100%)}
+.panel-s.p-hide .s-foot,.panel-s.kb .s-foot{transform:translateY(110%)}
+@media (max-width:719px){#dPanel{height:calc(100% - 8px - env(safe-area-inset-top,0px));max-height:none}}
+@media (prefers-reduced-motion:reduce){.hdr,.tabs,.s-top,.s-foot,.grp-h{transition:none}}
 .seg{display:inline-flex;background:var(--surface-2);border-radius:11px;padding:3px;gap:2px;flex:none}
 .seg button{border:0;background:transparent;border-radius:8px;height:32px;padding:0 11px;font-size:13.5px;color:var(--ink-2);white-space:nowrap}
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12);font-weight:600}
@@ -831,7 +841,7 @@ function renderTables(){
   $('#main').innerHTML = ctl + renderGroups(cs.all,'none',UI.tGroup==='type',UI.tSort,{noPin:true,hideT:true}) + pager;
   var s=$('#tstrip'), on=s&&s.querySelector('.tchip.on'); if(on) s.scrollLeft=on.offsetLeft-s.clientWidth/2+on.clientWidth/2;
 }
-function goTable(t){ t=+t; if(!t||t<1||t>16) return; UI.curT=t; saveUI(); render(); window.scrollTo(0, Math.min(window.scrollY, $('#hdr').offsetTop)); }
+function goTable(t){ t=+t; if(!t||t<1||t>16) return; UI.curT=t; saveUI(); render(); if(window.__showUI) window.__showUI(); window.scrollTo(0, Math.min(window.scrollY, $('#hdr').offsetTop)); }
 /* ---------- search sheet (all wines) ---------- */
 function renderSearch(){
   var v=$('#sq').value, el=$('#sRes');
@@ -1176,7 +1186,7 @@ function openDetail(no, keepTab){
   var w=BY.get(no); if(!w) return;
   if(!keepTab && $('#dSheet').hidden){ UI.dTab = rec(no).t ? 'note' : 'info'; }
   if(CTX.indexOf(no)<0) CTX=[no];
-  DET.no=no; var p=$('#dPanel'); p.innerHTML=detailHTML(w); p.scrollTop=0;
+  DET.no=no; var p=$('#dPanel'); p.innerHTML=detailHTML(w); p.scrollTop=0; p.classList.remove('p-hide');
   if($('#dSheet').hidden){ openSheet('dSheet'); }
   setTimeout(function(){ var b=p.querySelector('[data-act="close"]'); if(b) b.focus({preventScroll:true}); },30);
 }
@@ -1311,7 +1321,7 @@ document.addEventListener('click',function(e){
     case 'phdel': { if(!el.classList.contains('arm')){ el.classList.add('arm'); toast('한 번 더 누르면 사진이 삭제돼요'); setTimeout(function(){ el.classList.remove('arm'); },3000); } else { Assets.del(no, el.getAttribute('data-id')); toast('사진을 삭제했어요'); } break; }
     case 'fav': { var r2=rec(no); setRec(no,{f:r2.f?0:1}); toast(r2.f?'찜 해제':'찜 · 구매 후보에 추가'); if(UI.view==='mine') softRender(); break; }
     case 'rate': { var cur=rec(no).r||0, nv=+v; setRec(no,{r: cur===nv?0:nv}); paintActs(); break; }
-    case 'view': UI.view=v; saveUI(); closeSheets(); render(); window.scrollTo(0,0); break;
+    case 'view': UI.view=v; saveUI(); closeSheets(); render(); window.scrollTo(0,0); if(window.__showUI) window.__showUI(); break;
     case 'filters': renderFilters(); openSheet('fSheet'); break;
     case 'info': renderInfo(); openSheet('iSheet'); break;
     case 'fopt': {
@@ -1353,6 +1363,29 @@ document.addEventListener('change',function(e){
   else if(a==='agroup'){ UI.aGroup=el.value; saveUI(); render(); }
 });
 var qT=0;
+/* hide-on-scroll for page bars and the detail sheet */
+(function(){
+  var root=document.documentElement, lastY=window.scrollY, acc=0;
+  function setUI(on){ root.classList.toggle('ui-hide', !!on); }
+  window.__showUI=function(){ acc=0; setUI(false); };
+  window.addEventListener('scroll',function(){
+    var y=window.scrollY, dy=y-lastY; lastY=y;
+    var top=($('.mast')?$('.mast').offsetHeight:0)+90;
+    if(document.body.classList.contains('lock')) return;
+    if(y<top || window.innerHeight+y>=document.documentElement.scrollHeight-40){ acc=0; setUI(false); return; }
+    if((dy>0&&acc<0)||(dy<0&&acc>0)) acc=0; acc+=dy;
+    if(acc>28) setUI(true); else if(acc<-28) setUI(false);
+  },{passive:true});
+  var p=$('#dPanel'), pl=0, pa=0;
+  p.addEventListener('scroll',function(){
+    var y=p.scrollTop, dy=y-pl; pl=y;
+    if(y<80 || p.clientHeight+y>=p.scrollHeight-30){ pa=0; p.classList.remove('p-hide'); return; }
+    if((dy>0&&pa<0)||(dy<0&&pa>0)) pa=0; pa+=dy;
+    if(pa>28) p.classList.add('p-hide'); else if(pa<-28) p.classList.remove('p-hide');
+  },{passive:true});
+  p.addEventListener('focusin',function(e){ if(/TEXTAREA|INPUT/.test(e.target.tagName)) p.classList.add('kb'); });
+  p.addEventListener('focusout',function(){ p.classList.remove('kb'); });
+})();
 var sqT; $('#sq').addEventListener('input',function(){ clearTimeout(sqT); sqT=setTimeout(renderSearch,100); });
 $('#sq').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); var pq=parseQ(e.target.value); var w=(pq&&pq.no!=null)?BY.get(pq.no):null; if(!w){ var r=W.filter(function(x){return matchQ(x,pq);}); if(r.length===1) w=r[0]; } if(w){ var b=document.createElement('span'); b.setAttribute('data-act','sgo'); b.setAttribute('data-no',w.no); document.body.appendChild(b); b.click(); b.remove(); } else e.target.blur(); } });
 (function(){ var sx=0, sy=0, st=0, ok=false; var m=$('#main');
