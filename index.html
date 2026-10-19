@@ -92,6 +92,22 @@ svg.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-widt
 .tchip i{position:absolute;left:0;bottom:0;height:3px;background:var(--ok);width:var(--p,0%)}
 .tchip.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 .tchip.on b{color:var(--accent)}
+.tchip.full{background:color-mix(in srgb,var(--ok-soft) 70%,var(--surface))}
+.tchip.full b::after{content:"✓";font-size:10px;margin-left:2px;color:var(--ok)}
+.tttl{display:none;flex:1;min-width:0;align-items:baseline;gap:8px;white-space:nowrap;overflow:hidden}
+.tttl h2{margin:0;font-family:var(--f-display);font-size:21px;font-weight:700;letter-spacing:-.01em}
+.tttl h2 em{font-style:normal;color:var(--accent)}
+.tttl small{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+#sBtn{display:none}
+.hdr.tview .srch,.hdr.tview #fBtn{display:none}
+.hdr.tview #sBtn,.hdr.tview .tttl{display:inline-flex}
+.tpager{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0 8px}
+.tpager button{height:52px;border:1px solid var(--line-2);background:var(--surface);border-radius:12px;font-size:14.5px;display:flex;align-items:center;justify-content:center;gap:6px;min-width:0}
+.tpager button:disabled{opacity:.3}
+.tpager button small{color:var(--muted);font-size:12px}
+#sPanel{height:calc(100% - 28px - env(safe-area-inset-top,0px))}
+#sPanel .s-row .srch{flex:1}
+.shint{color:var(--muted);font-size:13.5px;margin:4px 2px}
 .seg{display:inline-flex;background:var(--surface-2);border-radius:11px;padding:3px;gap:2px;flex:none}
 .seg button{border:0;background:transparent;border-radius:8px;height:32px;padding:0 11px;font-size:13.5px;color:var(--ink-2);white-space:nowrap}
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12);font-weight:600}
@@ -411,6 +427,7 @@ h3.sec{font-family:var(--f-display);font-size:19px;margin:22px 0 4px}
 <header class="hdr" id="hdr">
   <div class="wrap hdr-in">
     <div class="hdr-row">
+      <span class="tttl" id="tTitle"></span>
       <label class="srch" for="q">
         <svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <span class="sr">와인 검색</span>
@@ -418,6 +435,7 @@ h3.sec{font-family:var(--f-display);font-size:19px;margin:22px 0 4px}
         <button class="xbtn" type="button" id="qClear" data-act="qclear" aria-label="검색어 지우기" hidden><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       </label>
       <button class="hbtn clock" type="button" id="clock" data-act="info" hidden></button>
+      <button class="hbtn" type="button" id="sBtn" data-act="search" aria-label="전체 와인 검색"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>검색</span></button>
       <button class="hbtn" type="button" id="fBtn" data-act="filters" aria-label="필터 열기"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span>필터</span><b id="fCount" hidden>0</b></button>
     </div>
     <div class="hdr-sub" id="hdrSub"></div>
@@ -436,6 +454,16 @@ h3.sec{font-family:var(--f-display);font-size:19px;margin:22px 0 4px}
   </div>
 </nav>
 
+<div class="sheet" id="sSheet" hidden>
+  <div class="sheet-bg" data-act="close"></div>
+  <section class="panel-s" role="dialog" aria-modal="true" aria-label="전체 와인 검색" id="sPanel">
+    <div class="s-top"><div class="s-row">
+      <label class="srch" for="sq"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="sr">전체 와인 검색</span><input id="sq" type="search" placeholder="이름·번호·품종·생산자 (전체 219종)" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"></label>
+      <button class="icb" type="button" data-act="close" aria-label="검색 닫기"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div></div>
+    <div class="s-body" id="sRes"></div>
+  </section>
+</div>
 <div class="sheet" id="dSheet" hidden>
   <div class="sheet-bg" data-act="close"></div>
   <section class="panel-s" role="dialog" aria-modal="true" aria-labelledby="dName" id="dPanel"></section>
@@ -478,7 +506,7 @@ var LS = {
   set:function(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
 };
 var REC = LS.get('dwl26.rec',{}) || {};
-var UI = Object.assign({dTab:'info',view:'tables',tGroup:'type',tSort:'no',aGroup:'none',aSort:'prio',pMode:'all',pCount:30,pOrder:'route',mSeg:'tasted',theme:'system',quick:''}, LS.get('dwl26.ui',{})||{});
+var UI = Object.assign({curT:1,dTab:'info',view:'tables',tGroup:'type',tSort:'no',aGroup:'none',aSort:'prio',pMode:'all',pCount:30,pOrder:'route',mSeg:'tasted',theme:'system',quick:''}, LS.get('dwl26.ui',{})||{});
 var F0 = {types:[],tables:[],countries:[],regions:[],grapes:[],price:[],score:0,rar:0,tags:[],status:'',top:false};
 var F = Object.assign({}, F0, LS.get('dwl26.f',{})||{});
 var Q = '';
@@ -750,7 +778,7 @@ function quickTypes(){
 }
 function renderGroups(list, gk, subType, sortKey, opt){
   opt=opt||{}; var html='', order=[];
-  var pin=pinned();
+  var pin=opt.noPin?null:pinned();
   if(pin){
     var pw=BY.get(pin);
     html+='<section class="grp"><div class="grp-h"><h2>번호 <em>'+pad3(pin)+'</em></h2><span class="meta">Table '+pw.t+'</span></div><div class="rows">'+rowHTML(pw,{pin:true,showT:true})+'</div></section>';
@@ -771,10 +799,10 @@ function renderGroups(list, gk, subType, sortKey, opt){
       var subs=groupList(items,'type');
       subs.forEach(function(s){
         body+='<div class="sub-h" style="--c:var(--t-'+s.k+')"><i class="dot"></i>'+TY[s.k]+' '+s.items.length+'</div>';
-        s.items.forEach(function(w){ body+=rowHTML(w,{showT:gk!=='table'}); order.push(w.no); });
+        s.items.forEach(function(w){ body+=rowHTML(w,{showT:!opt.hideT&&gk!=='table'}); order.push(w.no); });
       });
     } else {
-      items.forEach(function(w){ body+=rowHTML(w,{showT:gk!=='table'}); order.push(w.no); });
+      items.forEach(function(w){ body+=rowHTML(w,{showT:!opt.hideT&&gk!=='table'}); order.push(w.no); });
     }
     html+='<section class="grp"'+(gk==='table'?' id="tbl'+g.k+'" data-t="'+g.k+'"':'')+'>'+head+'<div class="rows">'+body+'</div></section>';
   });
@@ -784,22 +812,37 @@ function renderGroups(list, gk, subType, sortKey, opt){
 function pinBlock(){ var pin=pinned(); if(!pin) return ''; var pw=BY.get(pin); return '<section class="grp"><div class="grp-h"><h2>번호 <em>'+pad3(pin)+'</em></h2><span class="meta">Table '+pw.t+'</span></div><div class="rows">'+rowHTML(pw,{pin:true,showT:true})+'</div></section>'; }
 function emptyHTML(){ return '<div class="empty"><b>조건에 맞는 와인이 없어요</b>검색어나 필터를 줄여 보세요.<div class="btnrow" style="justify-content:center;margin-top:12px"><button class="btn" type="button" data-act="freset">필터 모두 지우기</button><button class="btn" type="button" data-act="qclear">검색어 지우기</button></div></div>'; }
 
+function tStats(t){ var all=W.filter(function(w){return w.t===t;}); return {all:all, done:all.filter(function(w){return rec(w.no).t;}).length, picks:all.filter(function(w){return w.rank&&w.rank<=30&&w.type!=='na'&&w.type!=='ot';}).length}; }
 function renderTables(){
-  var list=filtered();
-  var sub='<div class="strip" id="tstrip" role="group" aria-label="테이블로 이동">';
+  var cur=UI.curT=Math.min(16,Math.max(1,+UI.curT||1));
+  var sub='<div class="strip" id="tstrip" role="group" aria-label="테이블 선택">';
   for(var t=1;t<=16;t++){
-    var all=W.filter(function(w){return w.t===t;}); var done=all.filter(function(w){return rec(w.no).t;}).length;
-    var has=list.some(function(w){return w.t===t;});
-    sub+='<button class="tchip" type="button" data-act="jump" data-t="'+t+'" style="--p:'+Math.round(done/all.length*100)+'%;'+(has?'':'opacity:.35')+'" aria-label="테이블 '+t+'로 이동, '+done+'/'+all.length+' 마심"><b>'+t+'</b><i></i></button>';
+    var st=tStats(t);
+    sub+='<button class="tchip'+(t===cur?' on':'')+(st.done&&st.done===st.all.length?' full':'')+'" type="button" data-act="tgo" data-t="'+t+'" style="--p:'+Math.round(st.done/st.all.length*100)+'%" aria-pressed="'+(t===cur)+'" aria-label="테이블 '+t+', '+st.done+'/'+st.all.length+' 마심"><b>'+t+'</b><i></i></button>';
   }
   sub+='</div>';
   $('#hdrSub').innerHTML=sub;
-  var ctl='<div class="ctl"><div class="seg" role="group" aria-label="테이블 안 묶기"><button type="button" data-act="tgroup" data-v="type" aria-pressed="'+(UI.tGroup==='type')+'">종류별</button><button type="button" data-act="tgroup" data-v="none" aria-pressed="'+(UI.tGroup!=='type')+'">번호순 그대로</button></div>'+
-    '<label class="sel"><span class="sr">정렬</span><select id="tSort" data-act="tsort">'+['no','prio','best','viv','pdesc','rar','val'].map(function(k){return '<option value="'+k+'"'+(UI.tSort===k?' selected':'')+'>'+SORTS[k].l+'</option>';}).join('')+'</select></label>'+
-    '<span class="count">'+list.length+'종</span></div>';
-  $('#main').innerHTML = activeBar()+quickTypes()+ctl+(list.length? renderGroups(list,'table',UI.tGroup==='type',UI.tSort) : pinBlock()+emptyHTML());
-  observeTables();
+  var cs=tStats(cur);
+  $('#tTitle').innerHTML='<h2>Table <em>'+cur+'</em></h2><small>'+(cur===16?'프리테이스팅 · ':'')+cs.all.length+'종'+(cs.picks?' · 추천 '+cs.picks:'')+' · 마심 '+cs.done+'/'+cs.all.length+'</small>';
+  var ctl='<div class="ctl"><div class="seg" role="group" aria-label="테이블 안 구분"><button type="button" data-act="tgroup" data-v="type" aria-pressed="'+(UI.tGroup==='type')+'">종류별</button><button type="button" data-act="tgroup" data-v="none" aria-pressed="'+(UI.tGroup!=='type')+'">구분 없이</button></div>'+
+    '<label class="sel"><span class="sr">정렬</span><select id="tSort" data-act="tsort">'+['no','prio','best','viv','pdesc','pasc','rar','val'].map(function(k){return '<option value="'+k+'"'+(UI.tSort===k?' selected':'')+'>'+(k==='no'?'리스트 순서':SORTS[k].l)+'</option>';}).join('')+'</select></label></div>';
+  var prev=cur>1?cur-1:0, next=cur<16?cur+1:0;
+  var pager='<div class="tpager"><button type="button" data-act="tgo" data-t="'+prev+'"'+(prev?'':' disabled')+'>'+IC.l+(prev?'Table '+prev:'처음')+'</button><button type="button" data-act="tgo" data-t="'+next+'"'+(next?'':' disabled')+'>'+(next?'Table '+next:'마지막 테이블')+IC.r+'</button></div>';
+  $('#main').innerHTML = ctl + renderGroups(cs.all,'none',UI.tGroup==='type',UI.tSort,{noPin:true,hideT:true}) + pager;
+  var s=$('#tstrip'), on=s&&s.querySelector('.tchip.on'); if(on) s.scrollLeft=on.offsetLeft-s.clientWidth/2+on.clientWidth/2;
 }
+function goTable(t){ t=+t; if(!t||t<1||t>16) return; UI.curT=t; saveUI(); render(); window.scrollTo(0, Math.min(window.scrollY, $('#hdr').offsetTop)); }
+/* ---------- search sheet (all wines) ---------- */
+function renderSearch(){
+  var v=$('#sq').value, el=$('#sRes');
+  if(!v.trim()){ el.innerHTML='<p class="shint">번호(예: 76), 이름 일부, 품종·생산자로 219종 전체에서 찾아요. 결과를 누르면 그 와인의 테이블로 이동해요.</p>'; return; }
+  var pq=parseQ(v), pin=(pq&&pq.no!=null)?BY.get(pq.no):null;
+  var res=W.filter(function(w){return matchQ(w,pq);});
+  if(pin){ res=[pin].concat(res.filter(function(w){return w!==pin;})); }
+  res=res.slice(0,60);
+  el.innerHTML = res.length ? '<div class="rows">'+res.map(function(w){return rowHTML(w,{showT:true}).replace('data-act="open"','data-act="sgo"');}).join('')+'</div>' : '<p class="shint">찾는 와인이 없어요. 철자를 줄이거나 번호로 찾아 보세요.</p>';
+}
+function openSearch(){ $('#sSheet').hidden=false; lockBody(true); var i=$('#sq'); i.focus(); try{ i.select(); }catch(e){} renderSearch(); }
 function renderAll(){
   var list=filtered();
   var sub='<label class="sel"><span class="sr">묶기</span><select id="aGroup" data-act="agroup">'+Object.keys(GROUPS).map(function(k){return '<option value="'+k+'"'+(UI.aGroup===k?' selected':'')+'>'+GROUPS[k].l+'</option>';}).join('')+'</select></label>'+
@@ -882,6 +925,7 @@ function renderMine(){
 }
 function render(){
   document.querySelectorAll('.tab').forEach(function(b){ if(b.getAttribute('data-v')===UI.view) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
+  $('#hdr').classList.toggle('tview', UI.view==='tables');
   if(UI.view==='picks') renderPicks(); else if(UI.view==='all') renderAll(); else if(UI.view==='mine') renderMine(); else renderTables();
   var n=activeCount(); var fc=$('#fCount'); fc.hidden=!n; fc.textContent=n;
   setHdrH();
@@ -907,7 +951,7 @@ function setHdrH(){ var h=$('#hdr').getBoundingClientRect().height; document.doc
 var DET={no:null};
 function lockBody(on){ document.body.classList.toggle('lock',!!on); }
 function openSheet(id){ $('#'+id).hidden=false; lockBody(true); }
-function closeSheets(){ ['dSheet','fSheet','iSheet'].forEach(function(id){ $('#'+id).hidden=true; }); lockBody(false); DET.no=null; var lb=$('#lb'); if(lb) lb.hidden=true; }
+function closeSheets(){ ['dSheet','fSheet','iSheet','sSheet'].forEach(function(id){ $('#'+id).hidden=true; }); lockBody(false); DET.no=null; var lb=$('#lb'); if(lb) lb.hidden=true; }
 
 /* style axes: what the research says vs what I tasted */
 var AXL={body:'바디',acid:'산도',tan:'타닌',sweet:'당도',oak:'오크',bub:'기포',fruit:'과실감',fin:'여운',min:'미네랄',alc:'알코올'};
@@ -1208,7 +1252,7 @@ function renderInfo(){
   h+='<div><h4>행사</h4><p>'+esc(META.event||'')+'<br>'+esc(META.when||'')+'<br>'+esc(META.venue||'')+'</p><p id="infoClock"></p></div>';
   h+='<div class="fg"><h4>화면 테마</h4><div class="opts"><button class="chip" type="button" data-act="theme" data-v="system" aria-pressed="'+(th==='system')+'">시스템</button><button class="chip" type="button" data-act="theme" data-v="light" aria-pressed="'+(th==='light')+'">밝게</button><button class="chip" type="button" data-act="theme" data-v="dark" aria-pressed="'+(th==='dark')+'">어둡게</button></div></div>';
   h+='<div class="fg"><h4>화면 꺼짐 방지</h4><div class="opts"><button class="chip" type="button" data-act="wake" aria-pressed="'+(!!WAKE.on)+'">'+(WAKE.on?'켜짐':'꺼짐')+'</button></div><p class="note">행사 중 화면이 자꾸 꺼지면 켜 두세요. 배터리를 더 써요.</p></div>';
-  h+='<div><h4>사용 팁</h4><p>· 검색창에 <b>번호</b>(예: 76)를 치면 그 와인이 맨 위에 떠요. <b>T7</b>은 7번 테이블.<br>· 목록의 ✓는 마신 와인, 책갈피는 찜(구매 후보).<br>· 와인 상세의 ‘내 시음 노트’ 탭: 별점, 스타일 조정(조사값과 겹쳐 보기), 향·맛 버블, 메모, 라벨 사진.<br>· 병 사진(비비노 등에서 가져온 실제 사진)은 상세 화면에서 누르면 크게 보여요. 사진을 못 구한 와인은 병 모양·유리색을 반영한 일러스트로 보여 줘요.<br>· 상세 화면 아래 ‹ › 로 같은 목록의 이전·다음 와인으로 넘어가요.<br>· 기록은 이 기기에 저장되고, 로그인 상태면 내 계정에도 저장돼요.</p></div>';
+  h+='<div><h4>사용 팁</h4><p>· ‘테이블’ 화면은 한 번에 한 테이블만 보여요. 위쪽 번호를 누르거나 목록을 좌우로 밀면 다른 테이블로 넘어가요.<br>· 오른쪽 위 <b>검색</b>은 219종 전체에서 찾아요. <b>번호</b>(예: 76)나 이름 일부를 치고 결과를 누르면 그 테이블로 이동해요.<br>· 목록의 ✓는 마신 와인, 책갈피는 찜(구매 후보).<br>· 와인 상세의 ‘내 시음 노트’ 탭: 별점, 스타일 조정(조사값과 겹쳐 보기), 향·맛 버블, 메모, 라벨 사진.<br>· 병 사진(비비노 등에서 가져온 실제 사진)은 상세 화면에서 누르면 크게 보여요. 사진을 못 구한 와인은 병 모양·유리색을 반영한 일러스트로 보여 줘요.<br>· 상세 화면 아래 ‹ › 로 같은 목록의 이전·다음 와인으로 넘어가요.<br>· 기록은 이 기기에 저장되고, 로그인 상태면 내 계정에도 저장돼요.</p></div>';
   var cv=META.coverage||{};
   h+='<div><h4>데이터 안내</h4><p>'+esc(META.dataNote||'')+'</p>'+(META.imgNote?'<p>'+esc(META.imgNote)+'</p>':'')+(cv.total?'<p>수집 현황: 평론가 점수 '+cv.anyCritic+'종 · 비비노 '+cv.vivino+'종 · 국내가 '+cv.kr+'종 · 해외가 '+cv.usd+'종'+(cv.img?' · 병 사진 '+cv.img+'종':'')+' (전체 '+cv.total+'종)</p>':'')+'<p>평론가 약어: '+esc(META.abbrNote||'')+'</p></div>';
   h+='</div>';
@@ -1282,6 +1326,9 @@ document.addEventListener('click',function(e){
     case 'freset': F=JSON.parse(JSON.stringify(F0)); saveF(); if(!$('#fSheet').hidden) renderFilters(); render(); break;
     case 'qtype': { if(!v) F.types=[]; else toggleArr(F.types,v); saveF(); render(); break; }
     case 'qclear': $('#q').value=''; Q=''; $('#qClear').hidden=true; render(); break;
+    case 'tgo': goTable(el.getAttribute('data-t')); break;
+    case 'search': openSearch(); break;
+    case 'sgo': { var sw=BY.get(no); if(!sw) break; $('#sSheet').hidden=true; UI.view='tables'; UI.curT=sw.t; saveUI(); render(); window.scrollTo(0, Math.min(window.scrollY, $('#hdr').offsetTop)); openDetail(no); break; }
     case 'jump': { var sec=$('#tbl'+el.getAttribute('data-t')); if(sec){ var y=sec.getBoundingClientRect().top+window.scrollY-(parseInt(getComputedStyle(document.documentElement).getPropertyValue('--hdr-h'))||0)-4; window.scrollTo({top:y,behavior:'smooth'}); } break; }
     case 'tgroup': UI.tGroup=v; saveUI(); render(); break;
     case 'pmode': UI.pMode=v; saveUI(); render(); break;
@@ -1306,12 +1353,18 @@ document.addEventListener('change',function(e){
   else if(a==='agroup'){ UI.aGroup=el.value; saveUI(); render(); }
 });
 var qT=0;
+var sqT; $('#sq').addEventListener('input',function(){ clearTimeout(sqT); sqT=setTimeout(renderSearch,100); });
+$('#sq').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); var pq=parseQ(e.target.value); var w=(pq&&pq.no!=null)?BY.get(pq.no):null; if(!w){ var r=W.filter(function(x){return matchQ(x,pq);}); if(r.length===1) w=r[0]; } if(w){ var b=document.createElement('span'); b.setAttribute('data-act','sgo'); b.setAttribute('data-no',w.no); document.body.appendChild(b); b.click(); b.remove(); } else e.target.blur(); } });
+(function(){ var sx=0, sy=0, st=0, ok=false; var m=$('#main');
+  m.addEventListener('touchstart',function(e){ if(UI.view!=='tables'||e.touches.length!==1){ ok=false; return; } var t=e.target; ok=!(t.closest&&t.closest('select,input,textarea,.strip')); sx=e.touches[0].clientX; sy=e.touches[0].clientY; st=Date.now(); },{passive:true});
+  m.addEventListener('touchend',function(e){ if(!ok||UI.view!=='tables') return; ok=false; var t=e.changedTouches[0], dx=t.clientX-sx, dy=t.clientY-sy; if(Math.abs(dx)>70 && Math.abs(dx)>Math.abs(dy)*1.8 && Date.now()-st<700){ var n=UI.curT+(dx<0?1:-1); if(n>=1&&n<=16){ goTable(n); toast('Table '+n); } } },{passive:true});
+})();
 $('#q').addEventListener('input',function(e){ var v=e.target.value; $('#qClear').hidden=!v; clearTimeout(qT); qT=setTimeout(function(){ Q=v; render(); if(v) window.scrollTo(0, Math.min(window.scrollY, $('#hdr').offsetTop)); },120); });
 $('#q').addEventListener('keydown',function(e){ if(e.key==='Enter'){ var pq=parseQ(e.target.value); if(pq&&pq.no!=null&&BY.get(pq.no)){ e.preventDefault(); e.target.blur(); openDetail(pq.no); } else { e.target.blur(); } } });
 var mT=0;
 document.addEventListener('input',function(e){ if(e.target.id==='dMemo'){ var no=+e.target.getAttribute('data-no'), val=e.target.value; clearTimeout(mT); mT=setTimeout(function(){ setRec(no,{m:val}); },500); } });
 document.addEventListener('keydown',function(e){
-  if(e.key==='Escape'){ if(!$('#lb').hidden){ $('#lb').hidden=true; return; } if(!$('#dSheet').hidden||!$('#fSheet').hidden||!$('#iSheet').hidden){ closeSheets(); render(); } }
+  if(e.key==='Escape'){ if(!$('#lb').hidden){ $('#lb').hidden=true; return; } if(!$('#dSheet').hidden||!$('#fSheet').hidden||!$('#iSheet').hidden||!$('#sSheet').hidden){ closeSheets(); render(); } }
   if(e.key==='Enter' && e.target && e.target.id==='aroIn'){ e.preventDefault(); addAroma(DET.no); }
   if((e.key==='Enter'||e.key===' ') && e.target && e.target.getAttribute && e.target.getAttribute('data-act')==='bview'){ e.preventDefault(); e.target.click(); }
   if(!$('#dSheet').hidden && (e.key==='ArrowLeft'||e.key==='ArrowRight') && !/TEXTAREA|INPUT|SELECT/.test(document.activeElement.tagName)){
